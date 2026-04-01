@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
+
+  --color-canvas: #e8edf1;
+  --color-panel: #fbfdff;
+  --color-ink: #10273f;
+  --color-ink-muted: #54697b;
+  --color-brand: #143552;
+  --color-brand-strong: #0b2034;
+  --color-accent: #8d6743;
+  --color-line: #b3c0cb;
+  --color-highlight: #d2a062;
+
+  --shadow-card: 0 24px 55px rgba(10, 26, 43, 0.12);
+  --radius-shell: 2rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(224, 234, 241, 0.92), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(188, 200, 211, 0.42), transparent 30%),
+    linear-gradient(180deg, #f4f7fa 0%, var(--color-canvas) 100%);
+  color: var(--color-ink);
+  @apply font-sans antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.34), transparent 82%);
+  opacity: 0.42;
+}
+
+::selection {
+  background: rgba(20, 53, 82, 0.16);
+  color: var(--color-ink);
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display uppercase tracking-[0.08em] text-balance;
+  }
+
+  p {
+    @apply text-base leading-8 text-ink-muted;
+  }
+
+  a {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .surface-panel {
+    @apply rounded-shell border border-line/80 bg-panel/90 shadow-card backdrop-blur-sm;
+  }
+
+  .button-primary {
+    @apply inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-semibold tracking-[0.08em] text-panel transition-colors duration-200 hover:bg-brand hover:text-panel;
+  }
+
+  .button-secondary {
+    @apply inline-flex items-center gap-2 rounded-full border border-panel/25 bg-panel/10 px-5 py-3 text-sm font-semibold tracking-[0.08em] text-panel transition-colors duration-200 hover:bg-panel/20;
+  }
+
+  .nav-link {
+    @apply rounded-full border border-transparent px-4 py-2 text-sm font-medium text-ink-muted transition-colors duration-200 hover:border-line hover:bg-canvas/80 hover:text-brand;
+  }
+
+  .footer-link {
+    @apply text-sm leading-7 text-panel/75 transition-colors duration-200 hover:text-panel;
+  }
+}
