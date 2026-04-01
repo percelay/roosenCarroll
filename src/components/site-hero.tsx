@@ -1,81 +1,47 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
 
-import type { ContentBlock } from "@/lib/content";
+import type { HeroContent } from "@/lib/content";
 
-type HeroCta = {
-  href: string;
-  label: string;
-  tone: "primary" | "secondary";
-};
+import { PlaceholderBlock } from "./placeholder-block";
 
 type SiteHeroProps = {
-  title: string;
-  blocks: ContentBlock[];
-  ctas: HeroCta[];
-  imageSrc: string;
+  hero: HeroContent;
 };
 
-function getHeroParagraphs(blocks: ContentBlock[]) {
-  return blocks.filter((block): block is Extract<ContentBlock, { type: "paragraph" }> => block.type === "paragraph");
-}
-
-function getHeroListItems(blocks: ContentBlock[]) {
-  return blocks.flatMap((block) => (block.type === "list" ? block.items : []));
-}
-
-export function SiteHero({ title, blocks, ctas, imageSrc }: SiteHeroProps) {
-  const paragraphs = getHeroParagraphs(blocks);
-  const listItems = getHeroListItems(blocks);
-  const hasAsideContent = listItems.length > 0;
-
+export function SiteHero({ hero }: SiteHeroProps) {
   return (
     <section
-      id="top"
-      className="relative overflow-hidden rounded-shell border border-line/70 shadow-card"
+      id={hero.id}
+      className="relative overflow-hidden rounded-shell border border-brand-strong/80 bg-[linear-gradient(135deg,#0b2034_0%,#143552_52%,#1f4a6f_100%)] shadow-card"
     >
-      <div className="absolute inset-0">
-        <Image
-          src={imageSrc}
-          alt=""
-          fill
-          priority
-          className="object-cover object-center"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(11,32,52,0.96)_0%,rgba(11,32,52,0.86)_40%,rgba(11,32,52,0.58)_100%)]" />
+      <div className="absolute inset-0 opacity-70">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:72px_72px]" />
+        <div className="absolute -right-24 top-0 h-72 w-72 rounded-full bg-highlight/12 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-panel/8 blur-3xl" />
       </div>
 
-      <div
-        className={[
-          "relative grid gap-10 px-6 py-16 sm:px-8 sm:py-20 lg:px-12 lg:py-24",
-          hasAsideContent ? "lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.45fr)]" : ""
-        ].join(" ")}
-      >
+      <div className="relative grid gap-10 px-6 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)] lg:px-12 lg:py-24">
         <div className="max-w-3xl space-y-6">
-          <h1 className="max-w-[14ch] text-5xl leading-none text-panel sm:text-6xl lg:text-7xl">
-            {title}
+          <div className="inline-flex w-fit rounded-full border border-panel/20 bg-panel/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-panel">
+            {hero.label}
+          </div>
+
+          <h1 className="max-w-[15ch] text-5xl leading-none text-panel sm:text-6xl lg:text-7xl">
+            {hero.headline}
           </h1>
 
-          {paragraphs.length ? (
-            <div className="space-y-4">
-              {paragraphs.map((block, index) => (
-                <p
-                  key={`${block.type}-${index}`}
-                  className="max-w-2xl text-lg leading-8 text-panel/85 sm:text-xl"
-                >
-                  {block.text}
-                </p>
-              ))}
-            </div>
+          {hero.subheadline ? (
+            <p className="max-w-2xl text-lg leading-8 text-panel/84 sm:text-xl">
+              {hero.subheadline}
+            </p>
           ) : null}
 
-          {ctas.length ? (
+          {hero.ctas.length ? (
             <div className="flex flex-wrap gap-3 pt-2">
-              {ctas.map((cta) => (
+              {hero.ctas.map((cta) => (
                 <Link
-                  key={cta.href}
+                  key={cta.label}
                   href={cta.href}
                   className={cta.tone === "primary" ? "button-primary" : "button-secondary"}
                 >
@@ -91,18 +57,9 @@ export function SiteHero({ title, blocks, ctas, imageSrc }: SiteHeroProps) {
           ) : null}
         </div>
 
-        {listItems.length ? (
-          <div className="surface-panel self-end bg-brand-strong/60 p-6 backdrop-blur-md">
-            <div className="space-y-3">
-              {listItems.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-panel/20 bg-panel/10 px-4 py-3 text-sm leading-7 text-panel transition-colors duration-200 hover:bg-panel/15"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
+        {hero.placeholder ? (
+          <div className="self-end">
+            <PlaceholderBlock caption={hero.placeholder} tone="dark" />
           </div>
         ) : null}
       </div>

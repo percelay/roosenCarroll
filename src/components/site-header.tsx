@@ -23,7 +23,7 @@ export function SiteHeader({ brand, navItems, cta }: SiteHeaderProps) {
       <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
         <div className="surface-panel flex flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
           <Link href="#top" className="min-w-0 flex-1">
-            <span className="block max-w-[16ch] font-display text-2xl uppercase tracking-[0.1em] text-brand sm:text-3xl">
+            <span className="block max-w-[26ch] font-display text-lg uppercase leading-none tracking-[0.08em] text-brand sm:text-xl lg:text-2xl">
               {brand}
             </span>
           </Link>

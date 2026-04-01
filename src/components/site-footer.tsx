@@ -41,7 +41,7 @@ export function SiteFooter({ brand, navItems, contactLines }: SiteFooterProps) {
           ].join(" ")}
         >
           <div className="space-y-2">
-            <p className="max-w-[12ch] font-display text-4xl uppercase leading-none tracking-[0.1em] text-panel">
+            <p className="max-w-[22ch] font-display text-3xl uppercase leading-none tracking-[0.08em] text-panel sm:text-4xl">
               {brand}
             </p>
           </div>

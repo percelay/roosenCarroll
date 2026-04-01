@@ -1,29 +1,27 @@
 import type { Metadata } from "next";
 
 import { ContentSection } from "@/components/content-section";
+import { ServicesSection } from "@/components/services-section";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SiteHero } from "@/components/site-hero";
 import { getSiteModel } from "@/lib/content";
 
-const HERO_IMAGE_SRC = "/4d3232b9-6aea-421c-ae94-1893386cf922.jpg";
-
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteModel();
   const fallbackTitle = "Source Material Website";
-  const paragraph = site.heroBlocks.find((block) => block.type === "paragraph");
 
   return {
-    title: site.title ?? fallbackTitle,
+    title: site.brand ?? fallbackTitle,
     description:
-      paragraph?.text ?? "A content-driven business website rendered from sourcematerial.txt."
+      site.hero?.subheadline ?? "A content-driven business website rendered from sourcematerial.txt."
   };
 }
 
 export default async function HomePage() {
   const site = await getSiteModel();
 
-  if (!site.hasContent || !site.title) {
+  if (!site.hasContent || !site.brand || !site.hero) {
     return (
       <main className="mx-auto flex min-h-screen max-w-5xl items-center px-4 py-12 sm:px-6 lg:px-8">
         <section className="surface-panel w-full p-8 sm:p-10 lg:p-12">
@@ -49,22 +47,53 @@ export default async function HomePage() {
 
   return (
     <>
-      <SiteHeader brand={site.title} navItems={site.navItems} cta={site.ctas[0]} />
+      <SiteHeader brand={site.brand} navItems={site.navItems} cta={site.hero.ctas[0]} />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-8 sm:px-6 lg:px-8">
-        <SiteHero
-          title={site.title}
-          blocks={site.heroBlocks}
-          ctas={site.ctas.slice(0, 2)}
-          imageSrc={HERO_IMAGE_SRC}
-        />
+        <SiteHero hero={site.hero} />
 
-        {site.sections.map((section) => (
-          <ContentSection key={section.id} section={section} />
-        ))}
+        {site.about ? (
+          <ContentSection
+            id={site.about.id}
+            label={site.about.label}
+            description={site.about.paragraphs}
+          />
+        ) : null}
+
+        {site.services ? <ServicesSection section={site.services} /> : null}
+
+        {site.manufacturers ? (
+          <ContentSection
+            id={site.manufacturers.id}
+            label={site.manufacturers.label}
+            title={site.manufacturers.title}
+            description={site.manufacturers.description}
+            placeholders={site.manufacturers.placeholders}
+          />
+        ) : null}
+
+        {site.testimonials ? (
+          <ContentSection
+            id={site.testimonials.id}
+            label={site.testimonials.label}
+            title={site.testimonials.title}
+            description={site.testimonials.description}
+            placeholders={site.testimonials.placeholders}
+          />
+        ) : null}
+
+        {site.contact ? (
+          <ContentSection
+            id={site.contact.id}
+            label={site.contact.label}
+            title={site.contact.title}
+            description={site.contact.description}
+            placeholders={site.contact.placeholders}
+          />
+        ) : null}
       </main>
 
-      <SiteFooter brand={site.title} navItems={site.navItems} contactLines={site.contactLines} />
+      <SiteFooter brand={site.brand} navItems={site.navItems} contactLines={site.footerLines} />
     </>
   );
 }

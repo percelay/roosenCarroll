@@ -2,68 +2,88 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { cache } from "react";
 
-export type ContentBlock =
-  | {
-      type: "paragraph";
-      text: string;
-    }
-  | {
-      type: "list";
-      items: string[];
-    }
-  | {
-      type: "quote";
-      text: string;
-    }
-  | {
-      type: "placeholder";
-      caption: string;
-    };
-
-export type SiteSectionKind = "general" | "services" | "testimonials" | "contact";
-
-export type SiteSection = {
+export type NavItem = {
   id: string;
-  heading: string | null;
-  level: number;
-  kind: SiteSectionKind;
-  blocks: ContentBlock[];
-  sourceLines: string[];
+  label: string;
+};
+
+export type HeroCta = {
+  href: string;
+  label: string;
+  tone: "primary" | "secondary";
+};
+
+export type HeroContent = {
+  id: "hero";
+  label: string;
+  headline: string;
+  subheadline: string | null;
+  primaryCta: string | null;
+  secondaryCta: string | null;
+  placeholder: string | null;
+  ctas: HeroCta[];
+};
+
+export type AboutContent = {
+  id: "about";
+  label: string;
+  paragraphs: string[];
+};
+
+export type ServiceItem = {
+  id: string;
+  label: string;
+  title: string | null;
+  description: string | null;
+  placeholder: string | null;
+};
+
+export type ServicesContent = {
+  id: "services";
+  label: string;
+  items: ServiceItem[];
+};
+
+export type DetailContent = {
+  id: string;
+  label: string;
+  title: string | null;
+  description: string[];
+  placeholders: string[];
 };
 
 export type SiteModel = {
   hasContent: boolean;
-  title: string | null;
-  heroBlocks: ContentBlock[];
-  sections: SiteSection[];
-  navItems: Array<{
-    id: string;
-    label: string;
-  }>;
-  ctas: Array<{
-    href: string;
-    label: string;
-    tone: "primary" | "secondary";
-  }>;
-  contactLines: string[];
+  brand: string | null;
+  hero: HeroContent | null;
+  about: AboutContent | null;
+  services: ServicesContent | null;
+  manufacturers: DetailContent | null;
+  testimonials: DetailContent | null;
+  contact: DetailContent | null;
+  navItems: NavItem[];
+  footerLines: string[];
 };
 
-type WorkingSection = {
-  heading: string | null;
-  level: number;
-  lines: string[];
-};
+type SectionMap = Partial<Record<TopLevelSection, string[]>>;
+
+type TopLevelSection =
+  | "hero"
+  | "about"
+  | "services"
+  | "manufacturers"
+  | "testimonials"
+  | "contact";
 
 const CONTENT_FILE = path.join(process.cwd(), "sourcematerial.txt");
-const HEADING_RE = /^(#{1,6})\s+(.+)$/;
-const LIST_RE = /^([-*•]|\d+\.)\s+(.+)$/;
-const QUOTE_RE = /^>\s+(.+)$/;
-const PLACEHOLDER_RE =
-  /^(?:\[(?:[^\]]*\b(?:image|photo|visual|placeholder|rendering)\b[^\]]*)\]|(?:image|photo|visual|placeholder|rendering)\s*:.*)$/i;
-const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
-const PHONE_RE = /\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/;
-const ADDRESS_RE =
-  /\b\d{1,6}\s+[A-Za-z0-9.'-]+(?:\s+[A-Za-z0-9.'-]+){0,5}\s(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Parkway|Pkwy)\b/i;
+const TOP_LEVEL_LABELS: Array<[TopLevelSection, string]> = [
+  ["hero", "Hero"],
+  ["about", "About"],
+  ["services", "Services"],
+  ["manufacturers", "Manufacturers"],
+  ["testimonials", "Testimonials"],
+  ["contact", "Contact"]
+];
 
 function slugify(input: string, fallback: string) {
   const slug = input
@@ -75,324 +95,343 @@ function slugify(input: string, fallback: string) {
   return slug || fallback;
 }
 
-function dedupe<T>(items: T[]) {
-  return Array.from(new Set(items));
-}
-
-function isContactLine(line: string) {
-  return EMAIL_RE.test(line) || PHONE_RE.test(line) || ADDRESS_RE.test(line);
-}
-
-function isMeaningfulLine(line: string) {
-  return line.trim().length > 0;
-}
-
-function parseBlocks(lines: string[]): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-  let paragraphBuffer: string[] = [];
-  let listBuffer: string[] = [];
-  let quoteBuffer: string[] = [];
-
-  const flushParagraph = () => {
-    if (paragraphBuffer.length) {
-      blocks.push({
-        type: "paragraph",
-        text: paragraphBuffer.join(" ")
-      });
-      paragraphBuffer = [];
-    }
+function normalizeKey(input: string) {
+  const cyrillicToLatin: Record<string, string> = {
+    А: "A",
+    В: "B",
+    Е: "E",
+    К: "K",
+    М: "M",
+    Н: "H",
+    О: "O",
+    Р: "P",
+    С: "C",
+    Т: "T",
+    Х: "X",
+    а: "a",
+    е: "e",
+    о: "o",
+    р: "p",
+    с: "c",
+    т: "t",
+    х: "x",
+    у: "y",
+    і: "i"
   };
 
-  const flushList = () => {
-    if (listBuffer.length) {
-      blocks.push({
-        type: "list",
-        items: [...listBuffer]
-      });
-      listBuffer = [];
-    }
-  };
+  return input
+    .split("")
+    .map((character) => cyrillicToLatin[character] ?? character)
+    .join("")
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 
-  const flushQuote = () => {
-    if (quoteBuffer.length) {
-      blocks.push({
-        type: "quote",
-        text: quoteBuffer.join(" ")
-      });
-      quoteBuffer = [];
-    }
+function splitField(line: string) {
+  const separatorIndex = line.indexOf(":");
+
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  const rawKey = line.slice(0, separatorIndex).trim();
+  const value = line.slice(separatorIndex + 1).trim();
+
+  if (!rawKey || !value) {
+    return null;
+  }
+
+  return {
+    key: normalizeKey(rawKey),
+    value
   };
+}
+
+function isPlaceholderLine(line: string) {
+  return /^\[(?:[^\]]*placeholder[^\]]*)\]$/i.test(line.trim());
+}
+
+function splitTopLevelSections(lines: string[]) {
+  const sections: SectionMap = {};
+  let currentSection: TopLevelSection | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
 
     if (!trimmed) {
-      flushParagraph();
-      flushList();
-      flushQuote();
       continue;
     }
 
-    if (PLACEHOLDER_RE.test(trimmed)) {
-      flushParagraph();
-      flushList();
-      flushQuote();
+    const nextSection = TOP_LEVEL_LABELS.find(
+      ([section]) => normalizeKey(trimmed) === section
+    )?.[0];
 
-      blocks.push({
-        type: "placeholder",
-        caption: trimmed.replace(/^\[|\]$/g, "")
-      });
-
+    if (nextSection) {
+      currentSection = nextSection;
+      sections[currentSection] = [];
       continue;
     }
 
-    const listMatch = trimmed.match(LIST_RE);
-
-    if (listMatch) {
-      flushParagraph();
-      flushQuote();
-      listBuffer.push(listMatch[2].trim());
+    if (!currentSection) {
       continue;
     }
 
-    const quoteMatch = trimmed.match(QUOTE_RE);
-
-    if (quoteMatch) {
-      flushParagraph();
-      flushList();
-      quoteBuffer.push(quoteMatch[1].trim());
-      continue;
-    }
-
-    flushList();
-    flushQuote();
-    paragraphBuffer.push(trimmed);
+    sections[currentSection]?.push(trimmed);
   }
 
-  flushParagraph();
-  flushList();
-  flushQuote();
-
-  return blocks;
+  return sections;
 }
 
-function buildSections(rawSections: WorkingSection[]) {
-  const usedIds = new Map<string, number>();
-
-  return rawSections
-    .filter((section) => section.heading || section.lines.some(isMeaningfulLine))
-    .map((section, index) => {
-      const sourceLabel = section.heading ?? `section-${index + 1}`;
-      const baseId = slugify(sourceLabel, `section-${index + 1}`);
-      const seenCount = usedIds.get(baseId) ?? 0;
-      usedIds.set(baseId, seenCount + 1);
-      const id = seenCount ? `${baseId}-${seenCount + 1}` : baseId;
-
-      return {
-        id,
-        heading: section.heading,
-        level: section.level,
-        sourceLines: section.lines.filter(isMeaningfulLine),
-        blocks: parseBlocks(section.lines)
-      };
-    });
-}
-
-function classifySection(section: Omit<SiteSection, "kind">): SiteSectionKind {
-  const heading = (section.heading ?? "").toLowerCase();
-  const combinedText = section.sourceLines.join(" ").toLowerCase();
-  const hasQuotes = section.blocks.some((block) => block.type === "quote");
-  const listItemCount = section.blocks
-    .filter((block): block is Extract<ContentBlock, { type: "list" }> => block.type === "list")
-    .reduce((total, block) => total + block.items.length, 0);
-
-  if (
-    /\b(testimonial|testimonials|review|reviews|client|clients)\b/.test(heading) ||
-    hasQuotes
-  ) {
-    return "testimonials";
-  }
-
-  if (
-    /\b(contact|reach|connect|location|locations)\b/.test(heading) ||
-    section.sourceLines.some(isContactLine)
-  ) {
-    return "contact";
-  }
-
-  if (
-    /\b(service|services|solutions|products|materials|capabilities|capability|specialties|specialty|offerings|expertise|what we do)\b/.test(
-      heading
-    ) ||
-    (listItemCount >= 3 && !/\b(testimonial|review|contact)\b/.test(combinedText))
-  ) {
-    return "services";
-  }
-
-  return "general";
-}
-
-function extractContactLines(sections: SiteSection[]) {
-  const prioritized = sections.flatMap((section) => {
-    if (section.kind !== "contact") {
-      return [];
-    }
-
-    return section.blocks.flatMap((block) => {
-      if (block.type === "paragraph") {
-        return [block.text];
-      }
-
-      if (block.type === "list") {
-        return block.items;
-      }
-
-      return [];
-    });
-  });
-
-  if (prioritized.length) {
-    return dedupe(prioritized);
-  }
-
-  return dedupe(
-    sections.flatMap((section) =>
-      section.sourceLines.filter((line) => isContactLine(line.trim()))
-    )
-  );
-}
-
-function deriveSiteModel(raw: string): SiteModel {
-  const trimmed = raw.replace(/\r\n?/g, "\n").trim();
-
-  if (!trimmed) {
-    return {
-      hasContent: false,
-      title: null,
-      heroBlocks: [],
-      sections: [],
-      navItems: [],
-      ctas: [],
-      contactLines: []
-    };
-  }
-
-  const lines = trimmed.split("\n");
-  const containsMarkdownHeadings = lines.some((line) => HEADING_RE.test(line.trim()));
-
-  if (!containsMarkdownHeadings) {
-    const nonEmptyLines = lines.map((line) => line.trim()).filter(Boolean);
-    const title = nonEmptyLines[0] ?? null;
-    const heroBlocks = parseBlocks(lines.slice(1));
-
-    return {
-      hasContent: Boolean(title || heroBlocks.length),
-      title,
-      heroBlocks,
-      sections: [],
-      navItems: [],
-      ctas: [],
-      contactLines: heroBlocks.flatMap((block) => {
-        if (block.type === "list") {
-          return block.items.filter(isContactLine);
-        }
-
-        if (block.type === "paragraph" && isContactLine(block.text)) {
-          return [block.text];
-        }
-
-        return [];
-      })
-    };
-  }
-
-  const stagedSections: WorkingSection[] = [];
-  let current: WorkingSection = {
-    heading: null,
-    level: 0,
-    lines: []
-  };
+function parseHero(lines: string[]): HeroContent | null {
+  let headline: string | null = null;
+  let subheadline: string | null = null;
+  let primaryCta: string | null = null;
+  let secondaryCta: string | null = null;
+  let placeholder: string | null = null;
 
   for (const line of lines) {
-    const trimmedLine = line.trim();
-    const headingMatch = trimmedLine.match(HEADING_RE);
-
-    if (headingMatch) {
-      if (current.heading || current.lines.some(isMeaningfulLine)) {
-        stagedSections.push(current);
-      }
-
-      current = {
-        heading: headingMatch[2].trim(),
-        level: headingMatch[1].length,
-        lines: []
-      };
-
+    if (isPlaceholderLine(line)) {
+      placeholder = line;
       continue;
     }
 
-    current.lines.push(line);
+    const field = splitField(line);
+
+    if (!field) {
+      continue;
+    }
+
+    if (field.key === "headline") {
+      headline = field.value;
+      continue;
+    }
+
+    if (field.key === "subheadline") {
+      subheadline = field.value;
+      continue;
+    }
+
+    if (field.key === "primary cta") {
+      primaryCta = field.value;
+      continue;
+    }
+
+    if (field.key === "secondary cta") {
+      secondaryCta = field.value;
+    }
   }
 
-  if (current.heading || current.lines.some(isMeaningfulLine)) {
-    stagedSections.push(current);
+  if (!headline) {
+    return null;
   }
 
-  const leadSection =
-    stagedSections[0] && stagedSections[0].heading === null ? stagedSections[0] : null;
-  const headedSections = buildSections(stagedSections.filter((section) => section.heading !== null));
-  const heroSection = headedSections[0] ?? null;
-  const title = heroSection?.heading ?? null;
-  const heroBlocks = [
-    ...(leadSection ? parseBlocks(leadSection.lines) : []),
-    ...(heroSection ? heroSection.blocks : [])
-  ];
-  const bodySections = headedSections
-    .slice(heroSection ? 1 : 0)
-    .map((section) => ({
-      ...section,
-      kind: classifySection(section)
-    }));
-  const navItems = bodySections
-    .filter((section) => section.heading)
-    .map((section) => ({
-      id: section.id,
-      label: section.heading as string
-    }));
-  const primaryTarget =
-    bodySections.find((section) => section.kind === "services" && section.heading) ??
-    bodySections.find((section) => section.heading);
-  const secondaryTarget =
-    bodySections.find(
-      (section) => section.kind === "contact" && section.heading && section.id !== primaryTarget?.id
-    ) ??
-    bodySections.find((section) => section.heading && section.id !== primaryTarget?.id);
-  const ctas: SiteModel["ctas"] = [];
+  const ctas: HeroCta[] = [];
 
-  if (primaryTarget?.heading) {
+  if (primaryCta) {
     ctas.push({
-      href: `#${primaryTarget.id}`,
-      label: primaryTarget.heading,
+      href: "#contact",
+      label: primaryCta,
       tone: "primary"
     });
   }
 
-  if (secondaryTarget?.heading) {
+  if (secondaryCta) {
     ctas.push({
-      href: `#${secondaryTarget.id}`,
-      label: secondaryTarget.heading,
+      href: "#services",
+      label: secondaryCta,
       tone: "secondary"
     });
   }
 
   return {
-    hasContent: Boolean(title || heroBlocks.length || bodySections.length),
+    id: "hero",
+    label: "Hero",
+    headline,
+    subheadline,
+    primaryCta,
+    secondaryCta,
+    placeholder,
+    ctas
+  };
+}
+
+function parseAbout(lines: string[]): AboutContent | null {
+  const paragraphs = lines.filter((line) => !isPlaceholderLine(line));
+
+  if (!paragraphs.length) {
+    return null;
+  }
+
+  return {
+    id: "about",
+    label: "About",
+    paragraphs
+  };
+}
+
+function parseServices(lines: string[]): ServicesContent | null {
+  const items: ServiceItem[] = [];
+  let current: ServiceItem | null = null;
+
+  for (const line of lines) {
+    if (/^service\s+\d+$/i.test(line)) {
+      if (current) {
+        items.push(current);
+      }
+
+      current = {
+        id: slugify(line, `service-${items.length + 1}`),
+        label: line,
+        title: null,
+        description: null,
+        placeholder: null
+      };
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    if (isPlaceholderLine(line)) {
+      current.placeholder = line;
+      continue;
+    }
+
+    const field = splitField(line);
+
+    if (!field) {
+      continue;
+    }
+
+    if (field.key === "title") {
+      current.title = field.value;
+      continue;
+    }
+
+    if (field.key === "description") {
+      current.description = field.value;
+    }
+  }
+
+  if (current) {
+    items.push(current);
+  }
+
+  if (!items.length) {
+    return null;
+  }
+
+  return {
+    id: "services",
+    label: "Services",
+    items
+  };
+}
+
+function parseDetailSection(id: DetailContent["id"], label: string, lines: string[]): DetailContent | null {
+  let title: string | null = null;
+  const description: string[] = [];
+  const placeholders: string[] = [];
+
+  for (const line of lines) {
+    if (isPlaceholderLine(line)) {
+      placeholders.push(line);
+      continue;
+    }
+
+    const field = splitField(line);
+
+    if (!field) {
+      description.push(line);
+      continue;
+    }
+
+    if (field.key === "title") {
+      title = field.value;
+      continue;
+    }
+
+    if (field.key === "description") {
+      description.push(field.value);
+      continue;
+    }
+
+    if (field.key === "content placeholder") {
+      placeholders.push(`[Content Placeholder: ${field.value}]`);
+      continue;
+    }
+
+    description.push(field.value);
+  }
+
+  if (!title && !description.length && !placeholders.length) {
+    return null;
+  }
+
+  return {
+    id,
+    label,
     title,
-    heroBlocks,
-    sections: bodySections,
+    description,
+    placeholders
+  };
+}
+
+function deriveSiteModel(raw: string): SiteModel {
+  const normalized = raw.replace(/\r\n?/g, "\n").trim();
+
+  if (!normalized) {
+    return {
+      hasContent: false,
+      brand: null,
+      hero: null,
+      about: null,
+      services: null,
+      manufacturers: null,
+      testimonials: null,
+      contact: null,
+      navItems: [],
+      footerLines: []
+    };
+  }
+
+  const lines = normalized.split("\n");
+  const sections = splitTopLevelSections(lines);
+  const hero = parseHero(sections.hero ?? []);
+  const about = parseAbout(sections.about ?? []);
+  const services = parseServices(sections.services ?? []);
+  const manufacturers = parseDetailSection(
+    "manufacturers",
+    "Manufacturers",
+    sections.manufacturers ?? []
+  );
+  const testimonials = parseDetailSection(
+    "testimonials",
+    "Testimonials",
+    sections.testimonials ?? []
+  );
+  const contact = parseDetailSection("contact", "Contact", sections.contact ?? []);
+  const navItems: NavItem[] = [about, services, manufacturers, testimonials, contact]
+    .filter((section): section is Exclude<typeof section, null> => Boolean(section))
+    .map((section) => ({
+      id: section.id,
+      label: section.label
+    }));
+
+  return {
+    hasContent: Boolean(hero || about || services || manufacturers || testimonials || contact),
+    brand: hero?.headline ?? null,
+    hero,
+    about,
+    services,
+    manufacturers,
+    testimonials,
+    contact,
     navItems,
-    ctas,
-    contactLines: extractContactLines(bodySections)
+    footerLines: contact?.description ?? []
   };
 }
 
